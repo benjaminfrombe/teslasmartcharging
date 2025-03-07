@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v3
+  name: Tesla Smart Charge Blueprint v3 (Fixed Time Pattern)
   description: >
     Example configuration:
       - smoothed_power_sensor: sensor.smoothed_power_consumed
@@ -10,7 +10,7 @@ blueprint:
       - high_threshold: 800 W
       - low_threshold: 50 W
       - very_high_threshold: 4000 W
-      - polling_minutes: 1 minute
+      - polling_minutes: "/1"    # Triggers every minute (as a time pattern)
       - random_delay_max: 30 seconds
       - divisor: 690 (voltage over all phases, 1 phase = 230, 3 phases = 690)
     This blueprint adjusts the Tesla charging amperage based on power consumption using improved trigger identification, and toggles the charger switch based on the charging amps.
@@ -79,13 +79,12 @@ blueprint:
           max: 10000
           unit_of_measurement: W
     polling_minutes:
-      name: Polling Interval (Minutes)
-      description: Interval in minutes for the polling trigger.
-      default: 1
+      name: Polling Interval (Time Pattern)
+      description: >
+        Enter a valid time pattern for the polling trigger (e.g., "/1" for every minute).
+      default: "/1"
       selector:
-        number:
-          min: 1
-          max: 60
+        text: {}
     random_delay_max:
       name: Random Delay Maximum (Seconds)
       description: Maximum seconds for a random delay on the polling trigger.
@@ -110,7 +109,7 @@ trigger:
     for: "00:00:10"
     id: power_upper_trigger
   - platform: time_pattern
-    minutes: "/{{ polling_minutes }}"
+    minutes: !input polling_minutes
     id: polling_trigger
   - platform: numeric_state
     entity_id: !input smoothed_power_sensor
@@ -133,7 +132,7 @@ action:
           - condition: trigger
             id: polling_trigger
         sequence:
-          - delay: "00:00:{{ range(1, (random_delay_max | int)) | random }}"
+          - delay: "00:00:{{ range(1, (!input random_delay_max | int)) | random }}"
       # Low power branch: increase charging amps if below 7.
       - conditions:
           - condition: trigger
