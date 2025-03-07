@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v5 with Optional Smoothed Power and Adjustable Polling
+  name: Tesla Smart Charge Blueprint v6 with Optional Smoothed Power and Fixed Polling Pattern
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
@@ -12,7 +12,7 @@ blueprint:
       - high_threshold: 800 W
       - low_threshold: 50 W
       - very_high_threshold: 4000 W
-      - polling_interval: 1           # minutes (slider from 1 to 15)
+      - polling_time_pattern: "/1"    # Triggers every minute
       - random_delay_max: 30 seconds
       - divisor: 690
 
@@ -30,8 +30,6 @@ blueprint:
           - filter: time_simple_moving_average
             window_size: "00:00:02"
             precision: 0
-
-    Note: Ensure you have a sensor.time available in your system.
 
     This blueprint adjusts the Tesla charging amperage based on the calculated net power and toggles the charger switch accordingly.
   domain: automation
@@ -114,14 +112,13 @@ blueprint:
           min: 0
           max: 10000
           unit_of_measurement: W
-    polling_interval:
-      name: Polling Interval (Minutes)
-      description: Interval in minutes for the polling trigger.
-      default: 1
+    polling_time_pattern:
+      name: Polling Time Pattern
+      description: >
+        Time pattern for the polling trigger. For example, "/1" triggers every minute.
+      default: "/1"
       selector:
-        number:
-          min: 1
-          max: 15
+        text: {}
     random_delay_max:
       name: Random Delay Maximum (Seconds)
       description: Maximum seconds for a random delay on the polling trigger.
@@ -142,16 +139,15 @@ blueprint:
 trigger:
   - platform: template
     value_template: >
-      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.high_threshold | float) }}
+      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.high_threshold | float) }}
     for: "00:00:10"
     id: power_upper_trigger
-  - platform: template
-    value_template: >
-      {{ (states('sensor.time')[3:5]|int) % (input.polling_interval | int) == 0 }}
+  - platform: time_pattern
+    minutes: !input polling_time_pattern
     id: polling_trigger
   - platform: template
     value_template: >
-      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) < (input.low_threshold | float) }}
+      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) < (input.low_threshold | float) }}
     for: "00:00:01"
     id: power_low_trigger
 
@@ -165,13 +161,11 @@ condition:
 
 action:
   - choose:
-      # Polling branch: introduce a random delay.
       - conditions:
           - condition: trigger
             id: polling_trigger
         sequence:
           - delay: "00:00:{{ range(1, (random_delay_max | int)) | random }}"
-      # Low power branch: increase charging amps if below 7.
       - conditions:
           - condition: trigger
             id: power_low_trigger
@@ -187,9 +181,8 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ states(input.charging_amps_number)|int + -(((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0)) + 1 }}
+                        {{ states(input.charging_amps_number)|int + -(((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0)) + 1 }}
             default: []
-      # Upper power branch: adjust charging amps downward or disable charging.
       - conditions:
           - condition: trigger
             id: power_upper_trigger
@@ -198,7 +191,7 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.very_high_threshold | float) }}
+                      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.very_high_threshold | float) }}
                 sequence:
                   - service: number.set_value
                     target:
@@ -215,11 +208,10 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ [states(input.charging_amps_number)|int - (((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0, 'floor')), 0] | max }}
+                        {{ [states(input.charging_amps_number)|int - (((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0, 'floor')), 0] | max }}
             default: []
     default: []
   - choose:
-      # Toggle the charger switch based on the charging amps value.
       - conditions:
           - condition: numeric_state
             entity_id: !input charging_amps_number
