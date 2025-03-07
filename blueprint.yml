@@ -14,9 +14,10 @@ blueprint:
       - polling_minutes: 1 minute
       - random_delay_max: 30 seconds
       - divisor: 690
-    The smoothed power is calculated as:
+      
+    The net power is calculated as:
     
-      power_consumed - power_produced
+      net power = power_consumed - power_produced
       
     For additional smoothing you can define a sensor using the filter platform, for example:
     
@@ -28,7 +29,7 @@ blueprint:
             window_size: "00:00:02"
             precision: 0
             
-    This blueprint adjusts the Tesla charging amperage based on the calculated net power and toggles the charger switch accordingly.
+    This blueprint adjusts Tesla charging amperage based on the calculated net power and toggles the charger switch accordingly.
   domain: automation
   input:
     power_consumed_sensor:
@@ -65,164 +66,4 @@ blueprint:
       selector:
         entity:
           domain: sensor
-      default: sensor.tesla_ble_1fc6ac_ble_signal
-    charger_switch:
-      name: Charger Switch
-      description: Switch entity controlling the Tesla charger.
-      selector:
-        entity:
-          domain: switch
-      default: switch.tesla_ble_1fc6ac_charger_switch
-    high_threshold:
-      name: High Power Threshold
-      description: Calculated power (W) above which the upper trigger is activated.
-      default: 800
-      selector:
-        number:
-          min: 0
-          max: 10000
-          unit_of_measurement: W
-    low_threshold:
-      name: Low Power Threshold
-      description: Calculated power (W) below which the low trigger is activated.
-      default: 50
-      selector:
-        number:
-          min: 0
-          max: 10000
-          unit_of_measurement: W
-    very_high_threshold:
-      name: Very High Power Threshold
-      description: Calculated power (W) above which charging is immediately disabled.
-      default: 4000
-      selector:
-        number:
-          min: 0
-          max: 10000
-          unit_of_measurement: W
-    polling_minutes:
-      name: Polling Interval (Minutes)
-      description: Interval in minutes for the polling trigger.
-      default: 1
-      selector:
-        number:
-          min: 1
-          max: 60
-    random_delay_max:
-      name: Random Delay Maximum (Seconds)
-      description: Maximum seconds for a random delay on the polling trigger.
-      default: 30
-      selector:
-        number:
-          min: 1
-          max: 120
-    divisor:
-      name: Divisor for Amps Adjustment
-      description: Divisor used to calculate the adjustment step.
-      default: 690
-      selector:
-        number:
-          min: 1
-          max: 10000
-
-trigger:
-  - platform: numeric_state
-    value_template: >
-      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
-    above: !input high_threshold
-    for: "00:00:10"
-    id: power_upper_trigger
-  - platform: time_pattern
-    minutes: "/{{ polling_minutes }}"
-    id: polling_trigger
-  - platform: numeric_state
-    value_template: >
-      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
-    below: !input low_threshold
-    for: "00:00:01"
-    id: power_low_trigger
-
-condition:
-  - condition: state
-    entity_id: !input charge_flap_sensor
-    state: "on"
-  - condition: numeric_state
-    entity_id: !input ble_signal_sensor
-    above: -150
-
-action:
-  - choose:
-      # Polling branch: introduce a random delay.
-      - conditions:
-          - condition: trigger
-            id: polling_trigger
-        sequence:
-          - delay: "00:00:{{ range(1, (random_delay_max | int)) | random }}"
-      # Low power branch: increase charging amps if below 7.
-      - conditions:
-          - condition: trigger
-            id: power_low_trigger
-        sequence:
-          - choose:
-              - conditions:
-                  - condition: numeric_state
-                    entity_id: !input charging_amps_number
-                    below: 7
-                sequence:
-                  - service: number.set_value
-                    target:
-                      entity_id: !input charging_amps_number
-                    data:
-                      value: >
-                        {{ states(input.charging_amps_number) | int + -(((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0)) + 1 }}
-            default: []
-      # Upper power branch: adjust charging amps downward or disable charging.
-      - conditions:
-          - condition: trigger
-            id: power_upper_trigger
-        sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) > (input.very_high_threshold|float) }}
-                sequence:
-                  - service: number.set_value
-                    target:
-                      entity_id: !input charging_amps_number
-                    data:
-                      value: "0"
-                  - stop: ""
-              - conditions:
-                  - condition: numeric_state
-                    entity_id: !input charging_amps_number
-                    above: 0
-                sequence:
-                  - service: number.set_value
-                    target:
-                      entity_id: !input charging_amps_number
-                    data:
-                      value: >
-                        {{ [states(input.charging_amps_number) | int - (((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0, 'floor')), 0] | max }}
-            default: []
-    default: []
-  - choose:
-      # Toggle the charger switch based on the charging amps value.
-      - conditions:
-          - condition: numeric_state
-            entity_id: !input charging_amps_number
-            below: 1
-        sequence:
-          - service: switch.turn_off
-            target:
-              entity_id: !input charger_switch
-      - conditions:
-          - condition: numeric_state
-            entity_id: !input charging_amps_number
-            above: 0
-        sequence:
-          - service: switch.turn_on
-            target:
-              entity_id: !input charger_switch
-    default: []
-mode: single
+      default: sensor.tesla_ble_1fc6ac_ble
