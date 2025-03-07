@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v4 with Dual Power Sensors and Charger Switch
+  name: Tesla Smart Charge Blueprint v5
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
