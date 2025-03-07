@@ -139,7 +139,8 @@ blueprint:
 trigger:
   - platform: template
     value_template: >
-      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.high_threshold | float) }}
+      {% set net = (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) %}
+      {{ net > (input.high_threshold | float) }}
     for: "00:00:10"
     id: power_upper_trigger
   - platform: time_pattern
@@ -147,7 +148,8 @@ trigger:
     id: polling_trigger
   - platform: template
     value_template: >
-      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) < (input.low_threshold | float) }}
+      {% set net = (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) %}
+      {{ net < (input.low_threshold | float) }}
     for: "00:00:01"
     id: power_low_trigger
 
@@ -166,7 +168,9 @@ action:
           - condition: trigger
             id: polling_trigger
         sequence:
-          - delay: "00:00:{{ range(1, (input.random_delay_max | int)) | random }}"
+          - delay: >
+              {% set delay_sec = range(1, (input.random_delay_max | int)) | random %}
+              00:00:{{ "%02d"|format(delay_sec) }}
       # Low power branch: increase charging amps if below 7.
       - conditions:
           - condition: trigger
@@ -183,7 +187,8 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ states(input.charging_amps_number)|int + -(((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0)) + 1 }}
+                        {% set net = (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) %}
+                        {{ states(input.charging_amps_number)|int + (-((net / (input.divisor | float))|round(0))) + 1 }}
             default: []
       # Upper power branch: adjust charging amps downward or disable charging.
       - conditions:
@@ -194,7 +199,8 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.very_high_threshold | float) }}
+                      {% set net = (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) %}
+                      {{ net > (input.very_high_threshold | float) }}
                 sequence:
                   - service: number.set_value
                     target:
@@ -211,7 +217,8 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ [states(input.charging_amps_number)|int - (((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0, 'floor')), 0] | max }}
+                        {% set net = (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) %}
+                        {{ [states(input.charging_amps_number)|int - ((net / (input.divisor | float))|round(0, 'floor')), 0] | max }}
             default: []
     default: []
   - choose:
