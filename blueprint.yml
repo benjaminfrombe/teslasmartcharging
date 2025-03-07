@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v5
+  name: Tesla Smart Charge Blueprint v4 with Dual Power Sensors and Charger Switch
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
@@ -28,7 +28,7 @@ blueprint:
             window_size: "00:00:02"
             precision: 0
             
-    This blueprint adjusts the Tesla charging amperage based on the calculated power and toggles the charger switch accordingly.
+    This blueprint adjusts the Tesla charging amperage based on the calculated net power and toggles the charger switch accordingly.
   domain: automation
   input:
     power_consumed_sensor:
@@ -185,7 +185,7 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) > !input.very_high_threshold }}
+                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) > (input.very_high_threshold|float) }}
                 sequence:
                   - service: number.set_value
                     target:
