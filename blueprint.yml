@@ -19,7 +19,7 @@ blueprint:
 
       net power = power_consumed - power_produced
 
-    For additional smoothing, you can create a sensor externally using a time_simple_moving_average filter, for example:
+    For additional smoothing you can create a sensor externally using a time_simple_moving_average filter, for example:
 
       - platform: filter
         name: "Smoothed Power"
