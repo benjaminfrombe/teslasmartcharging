@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v6 !!!
+  name: Tesla Smart Charge Blueprint v7
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
@@ -145,10 +145,10 @@ trigger:
 
 condition:
   - condition: state
-    entity_id: !input.charge_flap_sensor
+    entity_id: !input charge_flap_sensor
     state: "on"
   - condition: numeric_state
-    entity_id: !input.ble_signal_sensor
+    entity_id: !input ble_signal_sensor
     above: -150
 
 action:
@@ -167,12 +167,12 @@ action:
           - choose:
               - conditions:
                   - condition: numeric_state
-                    entity_id: !input.charging_amps_number
+                    entity_id: !input charging_amps_number
                     below: 7
                 sequence:
                   - service: number.set_value
                     target:
-                      entity_id: !input.charging_amps_number
+                      entity_id: !input charging_amps_number
                     data:
                       value: >
                         {{ states(input.charging_amps_number) | int + -(((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0)) + 1 }}
@@ -190,17 +190,17 @@ action:
                 sequence:
                   - service: number.set_value
                     target:
-                      entity_id: !input.charging_amps_number
+                      entity_id: !input charging_amps_number
                     data:
                       value: "0"
               - conditions:
                   - condition: numeric_state
-                    entity_id: !input.charging_amps_number
+                    entity_id: !input charging_amps_number
                     above: 0
                 sequence:
                   - service: number.set_value
                     target:
-                      entity_id: !input.charging_amps_number
+                      entity_id: !input charging_amps_number
                     data:
                       value: >
                         {{ [states(input.charging_amps_number) | int - (((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0, 'floor')), 0] | max }}
@@ -210,19 +210,19 @@ action:
       # Toggle the charger switch based on the charging amps value.
       - conditions:
           - condition: numeric_state
-            entity_id: !input.charging_amps_number
+            entity_id: !input charging_amps_number
             below: 1
         sequence:
           - service: switch.turn_off
             target:
-              entity_id: !input.charger_switch
+              entity_id: !input charger_switch
       - conditions:
           - condition: numeric_state
-            entity_id: !input.charging_amps_number
+            entity_id: !input charging_amps_number
             above: 0
         sequence:
           - service: switch.turn_on
             target:
-              entity_id: !input.charger_switch
+              entity_id: !input charger_switch
     default: []
 mode: single
