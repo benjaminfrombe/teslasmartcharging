@@ -12,7 +12,7 @@ blueprint:
       - polling_minutes: 1 minute
       - random_delay_max: 30 seconds
       - divisor: 690
-    This blueprint adjusts Tesla charging amperage based on power consumption with improved trigger identification.
+    This blueprint adjusts Tesla charging amperage based on power consumption using improved trigger identification.
   domain: automation
   input:
     smoothed_power_sensor:
