@@ -31,6 +31,8 @@ blueprint:
             window_size: "00:00:02"
             precision: 0
 
+    Note: Ensure you have a sensor.time available in your system.
+
     This blueprint adjusts the Tesla charging amperage based on the calculated net power and toggles the charger switch accordingly.
   domain: automation
   input:
@@ -143,8 +145,9 @@ trigger:
       {{ (states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) > (input.high_threshold | float) }}
     for: "00:00:10"
     id: power_upper_trigger
-  - platform: time_pattern
-    minutes: "/{{ polling_interval }}"
+  - platform: template
+    value_template: >
+      {{ (states('sensor.time')[3:5]|int) % (input.polling_interval | int) == 0 }}
     id: polling_trigger
   - platform: template
     value_template: >
