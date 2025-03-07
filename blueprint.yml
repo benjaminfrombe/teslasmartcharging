@@ -1,8 +1,9 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v4 with Charger Switch
+  name: Tesla Smart Charge Blueprint v4 with Dual Power Sensors
   description: >
     Example configuration:
-      - smoothed_power_sensor: sensor.smoothed_power_consumed
+      - power_consumed_sensor: sensor.power_consumed
+      - power_produced_sensor: sensor.power_produced
       - charging_amps_number: number.tesla_ble_1fc6ac_charging_amps
       - charge_flap_sensor: binary_sensor.tesla_ble_1fc6ac_charge_flap
       - ble_signal_sensor: sensor.tesla_ble_1fc6ac_ble_signal
@@ -13,16 +14,37 @@ blueprint:
       - polling_minutes: 1 minute
       - random_delay_max: 30 seconds
       - divisor: 690
-    This blueprint adjusts the Tesla charging amperage based on power consumption using improved trigger identification, and toggles the charger switch based on the charging amps.
+    The smoothed power is calculated as:
+    
+      power_consumed - power_produced
+      
+    For additional smoothing, you can define a sensor using the filter platform (example below):
+    
+      - platform: filter
+        name: "Smoothed Power"
+        entity_id: sensor.power_net
+        filters:
+          - filter: time_simple_moving_average
+            window_size: "00:00:02"
+            precision: 0
+    
+    This blueprint adjusts Tesla charging amperage based on the calculated power consumption and toggles the charger switch accordingly.
   domain: automation
   input:
-    smoothed_power_sensor:
-      name: Smoothed Power Sensor
-      description: Sensor measuring the smoothed power consumption.
+    power_consumed_sensor:
+      name: Power Consumed Sensor
+      description: Sensor measuring power consumed.
       selector:
         entity:
           domain: sensor
-      default: sensor.smoothed_power_consumed
+      default: sensor.power_consumed
+    power_produced_sensor:
+      name: Power Produced Sensor
+      description: Sensor measuring power produced.
+      selector:
+        entity:
+          domain: sensor
+      default: sensor.power_produced
     charging_amps_number:
       name: Charging Amps Number
       description: Number entity controlling Tesla charging amperage.
@@ -53,7 +75,7 @@ blueprint:
       default: switch.tesla_ble_1fc6ac_charger_switch
     high_threshold:
       name: High Power Threshold
-      description: Power value (W) above which the upper trigger is activated.
+      description: Calculated power (W) above which the upper trigger is activated.
       default: 800
       selector:
         number:
@@ -62,7 +84,7 @@ blueprint:
           unit_of_measurement: W
     low_threshold:
       name: Low Power Threshold
-      description: Power value (W) below which the low trigger is activated.
+      description: Calculated power (W) below which the low trigger is activated.
       default: 50
       selector:
         number:
@@ -71,7 +93,7 @@ blueprint:
           unit_of_measurement: W
     very_high_threshold:
       name: Very High Power Threshold
-      description: Power consumption (W) above which charging is immediately disabled.
+      description: Calculated power (W) above which charging is immediately disabled.
       default: 4000
       selector:
         number:
@@ -105,7 +127,8 @@ blueprint:
 
 trigger:
   - platform: numeric_state
-    entity_id: !input smoothed_power_sensor
+    value_template: >
+      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
     above: !input high_threshold
     for: "00:00:10"
     id: power_upper_trigger
@@ -113,7 +136,8 @@ trigger:
     minutes: "/{{ polling_minutes }}"
     id: polling_trigger
   - platform: numeric_state
-    entity_id: !input smoothed_power_sensor
+    value_template: >
+      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
     below: !input low_threshold
     for: "00:00:01"
     id: power_low_trigger
@@ -150,7 +174,7 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ states(input.charging_amps_number) | int + -((states(input.smoothed_power_sensor) | float / input.divisor) | round(0)) + 1 }}
+                        {{ states(input.charging_amps_number) | int + -(((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0)) + 1 }}
             default: []
       # Upper power branch: adjust charging amps downward or disable charging.
       - conditions:
@@ -160,7 +184,8 @@ action:
           - choose:
               - conditions:
                   - condition: numeric_state
-                    entity_id: !input smoothed_power_sensor
+                    value_template: >
+                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
                     above: !input very_high_threshold
                 sequence:
                   - service: number.set_value
@@ -179,7 +204,7 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {{ [states(input.charging_amps_number) | int - ((states(input.smoothed_power_sensor) | float / input.divisor) | round(0, 'floor')), 0] | max }}
+                        {{ [states(input.charging_amps_number) | int - (((states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) / input.divisor) | round(0, 'floor')), 0] | max }}
             default: []
     default: []
   - choose:
