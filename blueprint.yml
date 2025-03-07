@@ -18,7 +18,7 @@ blueprint:
     
       power_consumed - power_produced
       
-    For additional smoothing, you can define a sensor using the filter platform (example below):
+    For additional smoothing you can define a sensor using the filter platform, for example:
     
       - platform: filter
         name: "Smoothed Power"
@@ -27,8 +27,8 @@ blueprint:
           - filter: time_simple_moving_average
             window_size: "00:00:02"
             precision: 0
-    
-    This blueprint adjusts Tesla charging amperage based on the calculated power consumption and toggles the charger switch accordingly.
+            
+    This blueprint adjusts the Tesla charging amperage based on the calculated power and toggles the charger switch accordingly.
   domain: automation
   input:
     power_consumed_sensor:
@@ -183,10 +183,9 @@ action:
         sequence:
           - choose:
               - conditions:
-                  - condition: numeric_state
+                  - condition: template
                     value_template: >
-                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) }}
-                    above: !input very_high_threshold
+                      {{ (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float) > !input.very_high_threshold }}
                 sequence:
                   - service: number.set_value
                     target:
