@@ -161,11 +161,13 @@ condition:
 
 action:
   - choose:
+      # Polling branch: introduce a random delay.
       - conditions:
           - condition: trigger
             id: polling_trigger
         sequence:
-          - delay: "00:00:{{ range(1, (random_delay_max | int)) | random }}"
+          - delay: "00:00:{{ range(1, (input.random_delay_max | int)) | random }}"
+      # Low power branch: increase charging amps if below 7.
       - conditions:
           - condition: trigger
             id: power_low_trigger
@@ -183,6 +185,7 @@ action:
                       value: >
                         {{ states(input.charging_amps_number)|int + -(((states(input.smoothed_power_sensor)|float if input.smoothed_power_sensor != "" else (states(input.power_consumed_sensor)|float - states(input.power_produced_sensor)|float)) / input.divisor)|round(0)) + 1 }}
             default: []
+      # Upper power branch: adjust charging amps downward or disable charging.
       - conditions:
           - condition: trigger
             id: power_upper_trigger
@@ -212,6 +215,7 @@ action:
             default: []
     default: []
   - choose:
+      # Toggle the charger switch based on the charging amps value.
       - conditions:
           - condition: numeric_state
             entity_id: !input charging_amps_number
