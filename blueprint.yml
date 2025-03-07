@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v6
+  name: Tesla Smart Charge Blueprint v6 !!!
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
