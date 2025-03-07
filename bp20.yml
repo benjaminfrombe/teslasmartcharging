@@ -1,5 +1,5 @@
 blueprint:
-  name: Tesla Smart Charge Blueprint v9 – Using !input in Templates
+  name: Tesla Smart Charge Blueprint v9 – Final
   description: >
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
@@ -16,13 +16,13 @@ blueprint:
       - random_delay_max: 30 seconds
       - divisor: 690
 
-    Net power is computed as follows:
+    Net power is computed as:
       • If smoothed_power_sensor is provided (non‑empty):
            net_power = state of smoothed_power_sensor
       • Else:
            net_power = (state of power_consumed_sensor) – (state of power_produced_sensor)
 
-    This blueprint adjusts the Tesla charging amperage based on net power and toggles the charger switch accordingly.
+    This blueprint adjusts Tesla charging amperage based on net power and toggles the charger switch accordingly.
   domain: automation
   input:
     power_consumed_sensor:
@@ -130,19 +130,14 @@ blueprint:
 trigger:
   - platform: template
     value_template: >
-      {# Assign blueprint inputs to local variables #}
-      {% set cons_sensor = !input power_consumed_sensor %}
-      {% set prod_sensor = !input power_produced_sensor %}
-      {% set smooth_sensor = !input smoothed_power_sensor %}
-      {% set high_thresh = !input high_threshold %}
-      {% set consumed = states(cons_sensor)|float(0) %}
-      {% set produced = states(prod_sensor)|float(0) %}
-      {% if smooth_sensor != "" %}
-        {% set net = states(smooth_sensor)|float(0) %}
-      {% else %}
-        {% set net = consumed - produced %}
-      {% endif %}
-      {{ net > (high_thresh|float) }}
+      {%- set cons = states(blueprint.inputs.power_consumed_sensor)|float(0) -%}
+      {%- set prod = states(blueprint.inputs.power_produced_sensor)|float(0) -%}
+      {%- if blueprint.inputs.smoothed_power_sensor != "" -%}
+        {%- set net = states(blueprint.inputs.smoothed_power_sensor)|float(0) -%}
+      {%- else -%}
+        {%- set net = cons - prod -%}
+      {%- endif -%}
+      {{ net > (blueprint.inputs.high_threshold | float) }}
     for: "00:00:10"
     id: high_trigger
   - platform: time_pattern
@@ -150,18 +145,14 @@ trigger:
     id: polling_trigger
   - platform: template
     value_template: >
-      {% set cons_sensor = !input power_consumed_sensor %}
-      {% set prod_sensor = !input power_produced_sensor %}
-      {% set smooth_sensor = !input smoothed_power_sensor %}
-      {% set low_thresh = !input low_threshold %}
-      {% set consumed = states(cons_sensor)|float(0) %}
-      {% set produced = states(prod_sensor)|float(0) %}
-      {% if smooth_sensor != "" %}
-        {% set net = states(smooth_sensor)|float(0) %}
-      {% else %}
-        {% set net = consumed - produced %}
-      {% endif %}
-      {{ net < (low_thresh|float) }}
+      {%- set cons = states(blueprint.inputs.power_consumed_sensor)|float(0) -%}
+      {%- set prod = states(blueprint.inputs.power_produced_sensor)|float(0) -%}
+      {%- if blueprint.inputs.smoothed_power_sensor != "" -%}
+        {%- set net = states(blueprint.inputs.smoothed_power_sensor)|float(0) -%}
+      {%- else -%}
+        {%- set net = cons - prod -%}
+      {%- endif -%}
+      {{ net < (blueprint.inputs.low_threshold | float) }}
     for: "00:00:01"
     id: low_trigger
 
@@ -180,7 +171,7 @@ action:
             id: polling_trigger
         sequence:
           - variables:
-              delay_sec: "{{ range(1, (!input random_delay_max | int) + 1) | random }}"
+              delay_sec: "{{ range(1, (blueprint.inputs.random_delay_max | int) + 1) | random }}"
           - delay: "00:00:{{ '%02d' | format(delay_sec) }}"
       - conditions:
           - condition: trigger
@@ -191,19 +182,14 @@ action:
               entity_id: !input charging_amps_number
             data:
               value: >
-                {% set cons_sensor = !input power_consumed_sensor %}
-                {% set prod_sensor = !input power_produced_sensor %}
-                {% set smooth_sensor = !input smoothed_power_sensor %}
-                {% set divisor = !input divisor %}
-                {% set current_amps = states(!input charging_amps_number)|int %}
-                {% set consumed = states(cons_sensor)|float(0) %}
-                {% set produced = states(prod_sensor)|float(0) %}
-                {% if smooth_sensor != "" %}
-                  {% set net = states(smooth_sensor)|float(0) %}
-                {% else %}
-                  {% set net = consumed - produced %}
-                {% endif %}
-                {{ current_amps + (-((net / (divisor|float))|round(0))) + 1 }}
+                {%- set cons = states(blueprint.inputs.power_consumed_sensor)|float(0) -%}
+                {%- set prod = states(blueprint.inputs.power_produced_sensor)|float(0) -%}
+                {%- if blueprint.inputs.smoothed_power_sensor != "" -%}
+                  {%- set net = states(blueprint.inputs.smoothed_power_sensor)|float(0) -%}
+                {%- else -%}
+                  {%- set net = cons - prod -%}
+                {%- endif -%}
+                {{ states(blueprint.inputs.charging_amps_number)|int + (-((net / (blueprint.inputs.divisor | float))|round(0))) + 1 }}
       - conditions:
           - condition: trigger
             id: high_trigger
@@ -212,18 +198,14 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {% set cons_sensor = !input power_consumed_sensor %}
-                      {% set prod_sensor = !input power_produced_sensor %}
-                      {% set smooth_sensor = !input smoothed_power_sensor %}
-                      {% set very_high_thresh = !input very_high_threshold %}
-                      {% set consumed = states(cons_sensor)|float(0) %}
-                      {% set produced = states(prod_sensor)|float(0) %}
-                      {% if smooth_sensor != "" %}
-                        {% set net = states(smooth_sensor)|float(0) %}
-                      {% else %}
-                        {% set net = consumed - produced %}
-                      {% endif %}
-                      {{ net > (very_high_thresh|float) }}
+                      {%- set cons = states(blueprint.inputs.power_consumed_sensor)|float(0) -%}
+                      {%- set prod = states(blueprint.inputs.power_produced_sensor)|float(0) -%}
+                      {%- if blueprint.inputs.smoothed_power_sensor != "" -%}
+                        {%- set net = states(blueprint.inputs.smoothed_power_sensor)|float(0) -%}
+                      {%- else -%}
+                        {%- set net = cons - prod -%}
+                      {%- endif -%}
+                      {{ net > (blueprint.inputs.very_high_threshold | float) }}
                 sequence:
                   - service: number.set_value
                     target:
@@ -240,19 +222,14 @@ action:
                       entity_id: !input charging_amps_number
                     data:
                       value: >
-                        {% set cons_sensor = !input power_consumed_sensor %}
-                        {% set prod_sensor = !input power_produced_sensor %}
-                        {% set smooth_sensor = !input smoothed_power_sensor %}
-                        {% set divisor = !input divisor %}
-                        {% set current_amps = states(!input charging_amps_number)|int %}
-                        {% set consumed = states(cons_sensor)|float(0) %}
-                        {% set produced = states(prod_sensor)|float(0) %}
-                        {% if smooth_sensor != "" %}
-                          {% set net = states(smooth_sensor)|float(0) %}
-                        {% else %}
-                          {% set net = consumed - produced %}
-                        {% endif %}
-                        {{ [current_amps - ((net / (divisor|float))|round(0, 'floor')), 0] | max }}
+                        {%- set cons = states(blueprint.inputs.power_consumed_sensor)|float(0) -%}
+                        {%- set prod = states(blueprint.inputs.power_produced_sensor)|float(0) -%}
+                        {%- if blueprint.inputs.smoothed_power_sensor != "" -%}
+                          {%- set net = states(blueprint.inputs.smoothed_power_sensor)|float(0) -%}
+                        {%- else -%}
+                          {%- set net = cons - prod -%}
+                        {%- endif -%}
+                        {{ [states(blueprint.inputs.charging_amps_number)|int - ((net / (blueprint.inputs.divisor | float))|round(0, 'floor')), 0] | max }}
             default: []
     default: []
   - choose:
