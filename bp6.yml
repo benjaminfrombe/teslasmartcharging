@@ -4,7 +4,7 @@ blueprint:
     Example configuration:
       - power_consumed_sensor: sensor.power_consumed
       - power_produced_sensor: sensor.power_produced
-      - smoothed_power_sensor: (optional) sensor.smoothed_power   # Leave empty to use (consumed - produced)
+      - smoothed_power_sensor: (optional) sensor.smoothed_power   # Leave empty to use (power_consumed - power_produced)
       - charging_amps_number: number.tesla_ble_1fc6ac_charging_amps
       - charge_flap_sensor: binary_sensor.tesla_ble_1fc6ac_charge_flap
       - ble_signal_sensor: sensor.tesla_ble_1fc6ac_ble_signal
@@ -57,7 +57,6 @@ blueprint:
         entity:
           domain: sensor
       default: ""
-      required: false
     charging_amps_number:
       name: Charging Amps Number
       description: Number entity controlling Tesla charging amperage.
